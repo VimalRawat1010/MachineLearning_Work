@@ -49,10 +49,12 @@ mat.df$class <- rep(levels(group), each=30)
 
 
 
-library("xgboost")  # the main algorithm
-library("archdata") # for the sample dataset
-library("caret")    # for the confusionmatrix() function (also needs e1071 package)
-library("dplyr")    # for some data preperation
+library(xgboost)  # the main algorithm
+library(archdata) # for the sample dataset
+library(caret)    # for the confusionmatrix() function (also needs e1071 package)
+library(plyr)
+library(dplyr)    # for some data preperation
+
 #library(doSNOW)
 
 mat.df$class <- as.factor(mat.df$class)
@@ -99,7 +101,7 @@ xgb_params <- list("objective" = "multi:softprob",
                    "eval_metric" = "mlogloss",
                    "booster" = "gbtree",
                    "num_class" = numberOfClasses)
-nround    <- 50 # number of XGBoost rounds
+nround    <- 200 # number of XGBoost rounds
 cv.nfold  <- 10
 # Fit cv.nfold * cv.nround XGB models and save OOF predictions
 
@@ -125,7 +127,29 @@ confusionMatrix(factor(OOF_prediction$label),
                 mode = "everything")
 
 
+bst_model <- xgb.train(params = xgb_params,
+                       data = train_matrix,
+                       nrounds = nround)
 
+test_pred <- predict(bst_model, newdata = test_matrix)
+test_prediction <- matrix(test_pred, nrow = numberOfClasses,
+                          ncol=length(test_pred)/numberOfClasses) %>% 
+                          t() %>% data.frame() %>% 
+                          mutate(label = test_label,
+                          max_prob = max.col(., "last"))
+# confusion matrix of test set
+confusionMatrix(factor(test_prediction$label),
+                factor(paste0('group',test_prediction$max_prob -1)),
+                mode = "everything")
+
+### Variable Importance
+# get the feature real names
+names <-  colnames(mat.df[,-1001])
+# compute feature importance matrix
+importance_matrix = xgb.importance(feature_names = names, model = bst_model)
+head(importance_matrix)
+gp = xgb.plot.importance(importance_matrix)
+print(gp) 
 
 
 ################ With Grid search
@@ -146,7 +170,7 @@ xgb_trcontrol_1 = trainControl(
 )
 
 xgbGrid = expand.grid(
-  nrounds = 2, 
+  nrounds = 100, 
   max_depth = c(5, 10, 15), 
   eta = c(0.01, 0.001, 0.0001), 
   gamma = c(1, 2, 3), 
@@ -154,9 +178,6 @@ xgbGrid = expand.grid(
   min_child_weight = c(0.5, 1, 1.5),
   subsample=c(0.2,0.2,0.2,0.2,0.2)
 )
-
-
-
 
 
 
