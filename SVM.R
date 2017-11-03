@@ -17,9 +17,9 @@ mat.test$celltype <- group[rownames(mat.test)]==ct
 ## Specify the type of analysis (e.g. classification) and provide data and response variable
 task <- makeClassifTask(data = mat.test, target = "celltype")
 
-R_MAX_NUM_DLLS=200
+#R_MAX_NUM_DLLS=200
 method <- 'cforest.importance'
 fv <- generateFilterValuesData(task, method = method)
 results <- fv$data
 results <- results[order(results[,3], decreasing=TRUE),]
-head(results)
+barplot(results$cforest.importance)
